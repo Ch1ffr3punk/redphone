@@ -9,6 +9,9 @@ It uses authenticated encryption (ChaCha20-Poly1305) with key derivation via Arg
 ![redphone](img/4.png)
 ![redphone](img/5.png)
 
+If you like Red Phone, as much as I do,  
+consider a small donation in cryptocurrencies.
+
 ```  
 BTC: 129yB8kL8mQVZufNS4huajsdJPa48aHwHz  
 Nym: n1yql04xjhmlhfkjsk8x8g7fynm27xzvnk23wfys  
