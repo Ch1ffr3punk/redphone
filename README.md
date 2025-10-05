@@ -9,6 +9,35 @@ It uses authenticated encryption (ChaCha20-Poly1305) with key derivation via Arg
 ![redphone](img/4.png)
 ![redphone](img/5.png)
 
+## 1. Password Protection  
+Passwords are immediately secured in memguard.LockedBuffer  
+
+Automatic destruction when out of scope  
+
+Secure wiping after use  
+
+## 2. Encryption Key Protection  
+Derived keys are stored in locked memory  
+
+Protected against memory dumping attacks  
+
+## 3. Plaintext Protection  
+Both input and output plaintexts are secured  
+
+Temporary copies are minimized  
+
+## 4. Secure Clipboard Clearing  
+Overwrites with random data before clearing  
+
+Prevents clipboard recovery attacks  
+
+## 5. Comprehensive Memory Management  
+memguard.CatchInterrupt() for cleanup on exit  
+
+memguard.Purge() on application close  
+
+Proper defer patterns for resource cleanup  
+
 If you like Red Phone, as much as I do,  
 consider a small donation in crypto currencies.
 
@@ -17,3 +46,8 @@ BTC: 129yB8kL8mQVZufNS4huajsdJPa48aHwHz
 Nym: n1yql04xjhmlhfkjsk8x8g7fynm27xzvnk23wfys  
 XMR: 45TJx8ZHngM4GuNfYxRw7R7vRyFgfMVp862JqycMrPmyfTfJAYcQGEzT27wL1z5RG1b5XfRPJk97KeZr1svK8qES2z1uZrS
 ```
+
+## 6. Enhanced Status Messages  
+Clear feedback about security operations    
+
+Authentication and integrity confirmation  
