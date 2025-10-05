@@ -38,6 +38,11 @@ memguard.Purge() on application close
 
 Proper defer patterns for resource cleanup  
 
+## 6. Enhanced Status Messages  
+Clear feedback about security operations    
+
+Authentication and integrity confirmation  
+
 If you like Red Phone, as much as I do,  
 consider a small donation in crypto currencies.
 
@@ -46,8 +51,3 @@ BTC: 129yB8kL8mQVZufNS4huajsdJPa48aHwHz
 Nym: n1yql04xjhmlhfkjsk8x8g7fynm27xzvnk23wfys  
 XMR: 45TJx8ZHngM4GuNfYxRw7R7vRyFgfMVp862JqycMrPmyfTfJAYcQGEzT27wL1z5RG1b5XfRPJk97KeZr1svK8qES2z1uZrS
 ```
-
-## 6. Enhanced Status Messages  
-Clear feedback about security operations    
-
-Authentication and integrity confirmation  
