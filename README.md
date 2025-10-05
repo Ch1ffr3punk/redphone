@@ -43,6 +43,7 @@ Clear feedback about security operations
 
 Authentication and integrity confirmation  
 
+## --
 If you like Red Phone, as much as I do,  
 consider a small donation in crypto currencies.
 
