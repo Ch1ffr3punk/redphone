@@ -44,7 +44,7 @@ Clear feedback about security operations
 Authentication and integrity confirmation  
 
 ## --
-If you like Red Phone, as much as I do, consider a small  
+If you like Red Phone as much as I do, consider a small  
 donation in crypto currencies, or buy me a coffee.
 ```  
 BTC: bc1qhgek8p5qcwz7r6502y8tvenkpsw9w5yafhatxk 
