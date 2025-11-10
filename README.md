@@ -1,7 +1,8 @@
 # Red Phone
 📞 Red Phone is a minimalist encryption tool designed for voice and SMS transmission.  
 
-It uses ChaCha20 with a 32 bytes hex key and a 12 bytes hex nonce. 
+It uses ChaCha20 with a 32 bytes hex key and a 12 bytes hex nonce.  
+For nonce creation, I recommend my [nora](https://github.com/Ch1ffr3punk/nora) program.  
 
 ![redphone](img/1.png)
 ![redphone](img/2.png)
