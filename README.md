@@ -1,7 +1,7 @@
 # Red Phone
-📞 Red Phone is a minimalist, secure encryption tool designed for voice and SMS transmission.  
+📞 Red Phone is a minimalist encryption tool designed for voice and SMS transmission.  
 
-It uses authenticated encryption (ChaCha20-Poly1305) with key derivation via Argon2id. 
+It uses ChaCha20 with a 32 bytes hex key and a 12 bytes hex nonce. 
 
 ![redphone](img/1.png)
 ![redphone](img/2.png)
@@ -9,43 +9,7 @@ It uses authenticated encryption (ChaCha20-Poly1305) with key derivation via Arg
 ![redphone](img/4.png)
 ![redphone](img/5.png)
 
-## 1. Password Protection  
-Passwords are immediately secured in memguard.LockedBuffer  
-
-Automatic destruction when out of scope  
-
-Secure wiping after use  
-
-## 2. Encryption Key Protection  
-Derived keys are stored in locked memory  
-
-Protected against memory dumping attacks  
-
-## 3. Plaintext Protection  
-Both input and output plaintexts are secured  
-
-Temporary copies are minimized  
-
-## 4. Secure Clipboard Clearing  
-Overwrites with random data before clearing  
-
-Prevents clipboard recovery attacks  
-
-## 5. Comprehensive Memory Management  
-memguard.CatchInterrupt() for cleanup on exit  
-
-memguard.Purge() on application close  
-
-Proper defer patterns for resource cleanup  
-
-## 6. Enhanced Status Messages  
-Clear feedback about security operations    
-
-Authentication and integrity confirmation  
-
-## --
-If you like Red Phone consider a small donation  
-in crypto currencies or buy me a coffee.
+If you like Red Phone consider a small donation in crypto currencies or buy me a coffee.
 ```  
 BTC: bc1qhgek8p5qcwz7r6502y8tvenkpsw9w5yafhatxk 
 Nym: n1yql04xjhmlhfkjsk8x8g7fynm27xzvnk23wfys  

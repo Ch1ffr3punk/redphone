@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -15,8 +16,7 @@ import (
 
 	"github.com/awnumar/memguard"
 
-	"golang.org/x/crypto/argon2"
-	"golang.org/x/crypto/chacha20poly1305"
+	"golang.org/x/crypto/chacha20"
 )
 
 // NATO encoding dictionary for voice transmission
@@ -189,94 +189,30 @@ func find(s string, dict []string) int {
 	return -1
 }
 
-// secureEncrypt: Encrypt with memguard protection for passwords and keys
-func secureEncrypt(plaintext []byte, password string) ([]byte, error) {
-	// Secure the plaintext in locked memory
-	securedPlaintext := memguard.NewBufferFromBytes(plaintext)
-	defer securedPlaintext.Destroy()
-
-	// Secure the password in locked memory
-	securedPassword := memguard.NewBufferFromBytes([]byte(password))
-	defer securedPassword.Destroy()
-
-	// Generate random salt (16 bytes)
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
-	}
-
-	// Derive key with Argon2id - key remains in normal memory temporarily
-	key := argon2.IDKey(securedPassword.Bytes(), salt, 3, 64*1024, 4, chacha20poly1305.KeySize)
-	
-	// Secure the derived key in locked memory
-	securedKey := memguard.NewBufferFromBytes(key)
-	defer securedKey.Destroy()
-
-	// Create AEAD cipher
-	aead, err := chacha20poly1305.NewX(securedKey.Bytes())
+// chacha20Encrypt: Encrypt with ChaCha20 without overhead
+func chacha20Encrypt(plaintext []byte, key []byte, nonce []byte) ([]byte, error) {
+	cipher, err := chacha20.NewUnauthenticatedCipher(key, nonce)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate random nonce (24 bytes for X variant)
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-
-	// Encrypt + authenticate using secured plaintext
-	ciphertext := aead.Seal(nil, nonce, securedPlaintext.Bytes(), nil)
-
-	// Prepend salt + nonce to ciphertext
-	result := make([]byte, 0, 16+24+len(ciphertext))
-	result = append(result, salt...)
-	result = append(result, nonce...)
-	result = append(result, ciphertext...)
-
-	return result, nil
+	ciphertext := make([]byte, len(plaintext))
+	cipher.XORKeyStream(ciphertext, plaintext)
+	
+	return ciphertext, nil
 }
 
-// secureDecrypt: Decrypt with memguard protection and authentication
-func secureDecrypt(encrypted []byte, password string) ([]byte, error) {
-	if len(encrypted) < 16+24+16 { // salt + nonce + min tag
-		return nil, fmt.Errorf("ciphertext too short - possible manipulation or corruption")
-	}
-
-	// Secure the password in locked memory
-	securedPassword := memguard.NewBufferFromBytes([]byte(password))
-	defer securedPassword.Destroy()
-
-	salt := encrypted[:16]
-	nonce := encrypted[16:40]
-	ciphertext := encrypted[40:]
-
-	// Derive key with Argon2id
-	key := argon2.IDKey(securedPassword.Bytes(), salt, 3, 64*1024, 4, chacha20poly1305.KeySize)
-	
-	// Secure the derived key in locked memory
-	securedKey := memguard.NewBufferFromBytes(key)
-	defer securedKey.Destroy()
-
-	aead, err := chacha20poly1305.NewX(securedKey.Bytes())
+// chacha20Decrypt: Decrypt with ChaCha20 without overhead
+func chacha20Decrypt(ciphertext []byte, key []byte, nonce []byte) ([]byte, error) {
+	cipher, err := chacha20.NewUnauthenticatedCipher(key, nonce)
 	if err != nil {
 		return nil, err
 	}
 
-	// Decrypt and authenticate
-	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return nil, fmt.Errorf("decryption failed - message may be corrupted, manipulated, or password is wrong")
-	}
-
-	// Secure the decrypted plaintext in locked memory
-	securedPlaintext := memguard.NewBufferFromBytes(plaintext)
-	defer securedPlaintext.Destroy()
-
-	// Return a copy of the secured data
-	result := make([]byte, len(plaintext))
-	copy(result, securedPlaintext.Bytes())
+	plaintext := make([]byte, len(ciphertext))
+	cipher.XORKeyStream(plaintext, ciphertext)
 	
-	return result, nil
+	return plaintext, nil
 }
 
 // secureClearClipboard: Securely clears clipboard by overwriting with random data
@@ -351,40 +287,88 @@ func decodeHEX(text string) ([]byte, error) {
 	return result, nil
 }
 
-// showPasswordDialog: Secure password dialog with memguard protection
-func showPasswordDialog(title string, callback func(string), parent fyne.Window) {
-	passwordEntry := widget.NewPasswordEntry()
+// showKeyNonceDialog: Dialog for entering key and nonce
+func showKeyNonceDialog(title string, callback func(key []byte, nonce []byte), parent fyne.Window) {
+	keyEntry := widget.NewEntry()
+	keyEntry.SetPlaceHolder("32-byte hex key (64 characters)")
+	nonceEntry := widget.NewEntry()
+	nonceEntry.SetPlaceHolder("12-byte hex nonce (24 characters)")
+	
 	dialogContent := container.NewVBox(
-		passwordEntry,
+		widget.NewLabel("Key (32 bytes hex):"),
+		keyEntry,
+		widget.NewLabel("Nonce (12 bytes hex):"),
+		nonceEntry,
 	)
 
 	d := dialog.NewCustomConfirm(title, "OK", "Cancel", dialogContent, func(confirmed bool) {
 		if confirmed {
-			if passwordEntry.Text == "" {
-				dialog.ShowError(fmt.Errorf("password cannot be empty"), parent)
-				return
-			}
-			if len(passwordEntry.Text) < 12 {
-				dialog.ShowError(fmt.Errorf("password must be at least 12 characters long"), parent)
+			if keyEntry.Text == "" || nonceEntry.Text == "" {
+				dialog.ShowError(fmt.Errorf("key and nonce cannot be empty"), parent)
 				return
 			}
 			
-			// Immediately secure the password in locked memory
-			securedPassword := memguard.NewBufferFromBytes([]byte(passwordEntry.Text))
-			defer securedPassword.Destroy()
+			// Validate key length (32 bytes = 64 hex characters)
+			if len(keyEntry.Text) != 64 {
+				dialog.ShowError(fmt.Errorf("key must be exactly 64 hex characters (32 bytes)"), parent)
+				return
+			}
 			
-			// Pass a copy to the callback
-			passwordCopy := make([]byte, securedPassword.Size())
-			copy(passwordCopy, securedPassword.Bytes())
+			// Validate nonce length (12 bytes = 24 hex characters)
+			if len(nonceEntry.Text) != 24 {
+				dialog.ShowError(fmt.Errorf("nonce must be exactly 24 hex characters (12 bytes)"), parent)
+				return
+			}
 			
-			callback(string(passwordCopy))
+			// Decode key
+			keyBytes, err := hex.DecodeString(keyEntry.Text)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("invalid hex format for key: %v", err), parent)
+				return
+			}
 			
-			// Securely clear the password entry
-			passwordEntry.SetText("")
+			// Decode nonce
+			nonceBytes, err := hex.DecodeString(nonceEntry.Text)
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("invalid hex format for nonce: %v", err), parent)
+				return
+			}
+			
+			// Validate key length in bytes
+			if len(keyBytes) != 32 {
+				dialog.ShowError(fmt.Errorf("key must be exactly 32 bytes after hex decoding"), parent)
+				return
+			}
+			
+			// Validate nonce length in bytes (12 Bytes)
+			if len(nonceBytes) != 12 {
+				dialog.ShowError(fmt.Errorf("nonce must be exactly 12 bytes after hex decoding"), parent)
+				return
+			}
+			
+			// Secure the key and nonce in locked memory
+			securedKey := memguard.NewBufferFromBytes(keyBytes)
+			defer securedKey.Destroy()
+			
+			securedNonce := memguard.NewBufferFromBytes(nonceBytes)
+			defer securedNonce.Destroy()
+			
+			// Pass copies to the callback
+			keyCopy := make([]byte, securedKey.Size())
+			copy(keyCopy, securedKey.Bytes())
+			
+			nonceCopy := make([]byte, securedNonce.Size())
+			copy(nonceCopy, securedNonce.Bytes())
+			
+			callback(keyCopy, nonceCopy)
+			
+			// Securely clear the entries
+			keyEntry.SetText("")
+			nonceEntry.SetText("")
 		}
 	}, parent)
 
-	d.Resize(fyne.NewSize(400, 150))
+	d.Resize(fyne.NewSize(500, 200))
 	d.Show()
 }
 
@@ -436,7 +420,7 @@ func main() {
 	statusBar.TextStyle.Monospace = true
 	statusBar.TextStyle.Italic = true
 
-	// Encrypt button with memguard protection
+	// Encrypt button with ChaCha20
 	encryptBtn := widget.NewButtonWithIcon("Encrypt", theme.MailComposeIcon(), func() {
 		if strings.TrimSpace(textArea.Text) == "" {
 			statusBar.SetText("Error: Input field is empty")
@@ -444,15 +428,16 @@ func main() {
 			return
 		}
 
-		showPasswordDialog("Enter Password", func(password string) {
+		showKeyNonceDialog("Enter Key and Nonce", func(key []byte, nonce []byte) {
 			// Secure the plaintext in locked memory
 			plaintext := []byte(textArea.Text)
 			securedPlaintext := memguard.NewBufferFromBytes(plaintext)
 			defer securedPlaintext.Destroy()
 
-			encrypted, err := secureEncrypt(securedPlaintext.Bytes(), password)
+			encrypted, err := chacha20Encrypt(securedPlaintext.Bytes(), key, nonce)
 			if err != nil {
 				statusBar.SetText("Encryption failed: " + err.Error())
+				dialog.ShowError(fmt.Errorf("encryption failed: %v", err), w)
 				return
 			}
 
@@ -469,7 +454,7 @@ func main() {
 		}, w)
 	})
 
-	// Decrypt button with memguard protection
+	// Decrypt button with ChaCha20
 	decryptBtn := widget.NewButtonWithIcon("Decrypt", theme.MailForwardIcon(), func() {
 		if strings.TrimSpace(textArea.Text) == "" {
 			statusBar.SetText("Error: Input field is empty")
@@ -477,7 +462,7 @@ func main() {
 			return
 		}
 
-		showPasswordDialog("Enter Password", func(password string) {
+		showKeyNonceDialog("Enter Key and Nonce", func(key []byte, nonce []byte) {
 			var decoded []byte
 			var decodeErr error
 
@@ -485,6 +470,7 @@ func main() {
 				decoded, decodeErr = decodeHEX(textArea.Text)
 				if decodeErr != nil {
 					statusBar.SetText("HEX decode failed: " + decodeErr.Error())
+					dialog.ShowError(fmt.Errorf("HEX decode failed: %v", decodeErr), w)
 					return
 				}
 			} else {
@@ -495,9 +481,10 @@ func main() {
 			securedDecoded := memguard.NewBufferFromBytes(decoded)
 			defer securedDecoded.Destroy()
 
-			plaintext, err := secureDecrypt(securedDecoded.Bytes(), password)
+			plaintext, err := chacha20Decrypt(securedDecoded.Bytes(), key, nonce)
 			if err != nil {
 				statusBar.SetText("Decryption failed: " + err.Error())
+				dialog.ShowError(fmt.Errorf("decryption failed: %v", err), w)
 				return
 			}
 
@@ -506,7 +493,7 @@ func main() {
 			defer securedPlaintext.Destroy()
 
 			textArea.SetText(string(securedPlaintext.Bytes()))
-			statusBar.SetText("Decrypted - Authentication verified, message integrity confirmed")
+			statusBar.SetText("Decrypted successfully")
 		}, w)
 	})
 
@@ -550,7 +537,7 @@ func main() {
 	w.SetContent(mainContent)
 	w.Resize(fyne.NewSize(800, 600))
 	w.CenterOnScreen()
-	w.SetTitle("Red Phone - Secure Communication")
+	w.SetTitle("Red Phone")
 
 	w.ShowAndRun()
 }
